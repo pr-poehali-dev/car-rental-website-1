@@ -1,8 +1,6 @@
 
 import { CarProps } from "@/components/CarCard";
-
-// Базовый URL API
-const API_URL = "https://api.autopro.ru/v1";
+import { apiClient } from "./api-client";
 
 // Типы данных для API
 export interface ApiResponse<T> {
@@ -29,16 +27,30 @@ export interface CarCreateData {
   description?: string;
 }
 
-// Имитация API запросов (заглушки)
-// В реальном проекте здесь будут настоящие fetch запросы
-
 // Получение списка автомобилей
 export const fetchCars = async (
   page = 1, 
   limit = 10, 
   filters?: Record<string, any>
 ): Promise<PaginatedResponse<CarProps>> => {
+  // В реальном проекте здесь будет вызов API через apiClient
   console.log("API call: fetchCars", { page, limit, filters });
+  
+  // Имитация запроса через apiClient
+  const queryParams = new URLSearchParams();
+  queryParams.append('page', page.toString());
+  queryParams.append('limit', limit.toString());
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, String(value));
+      }
+    });
+  }
+  
+  // В реальном проекте:
+  // return apiClient.get<PaginatedResponse<CarProps>>(`/cars?${queryParams.toString()}`);
   
   // Имитация запроса
   await new Promise(resolve => setTimeout(resolve, 800));
@@ -86,6 +98,9 @@ export const fetchCars = async (
 export const fetchCarById = async (id: string): Promise<CarProps> => {
   console.log("API call: fetchCarById", { id });
   
+  // В реальном проекте:
+  // return apiClient.get<CarProps>(`/cars/${id}`);
+  
   // Имитация запроса
   await new Promise(resolve => setTimeout(resolve, 500));
   
@@ -107,6 +122,9 @@ export const fetchCarById = async (id: string): Promise<CarProps> => {
 export const createCar = async (data: CarCreateData): Promise<CarProps> => {
   console.log("API call: createCar", { data });
   
+  // В реальном проекте:
+  // return apiClient.post<CarProps>('/cars', data);
+  
   // Имитация запроса
   await new Promise(resolve => setTimeout(resolve, 1000));
   
@@ -122,6 +140,9 @@ export const createCar = async (data: CarCreateData): Promise<CarProps> => {
 // Обновление автомобиля
 export const updateCar = async (id: string, data: Partial<CarCreateData>): Promise<CarProps> => {
   console.log("API call: updateCar", { id, data });
+  
+  // В реальном проекте:
+  // return apiClient.patch<CarProps>(`/cars/${id}`, data);
   
   // Имитация запроса
   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -144,6 +165,10 @@ export const updateCar = async (id: string, data: Partial<CarCreateData>): Promi
 export const deleteCar = async (id: string): Promise<boolean> => {
   console.log("API call: deleteCar", { id });
   
+  // В реальном проекте:
+  // await apiClient.delete(`/cars/${id}`);
+  // return true;
+  
   // Имитация запроса
   await new Promise(resolve => setTimeout(resolve, 700));
   
@@ -151,15 +176,22 @@ export const deleteCar = async (id: string): Promise<boolean> => {
 };
 
 // Аутентификация администратора
-export const adminLogin = async (username: string, password: string): Promise<{token: string; user: {id: string; name: string; role: string}}> => {
+export const adminLogin = async (username: string, password: string) => {
   console.log("API call: adminLogin", { username });
   
-  // Имитация запроса
+  // В реальном проекте используем apiClient
+  // return apiClient.login(username, password);
+  
+  // Имитация запроса - в реальном приложении будет использоваться apiClient.login
   await new Promise(resolve => setTimeout(resolve, 800));
   
   if (username === "admin" && password === "admin") {
     return {
-      token: "mock-jwt-token-for-admin",
+      tokens: {
+        accessToken: "mock-jwt-token-for-admin",
+        refreshToken: "mock-refresh-token",
+        expiresAt: Date.now() + 3600 * 1000 // истекает через час
+      },
       user: {
         id: "1",
         name: "Администратор",
