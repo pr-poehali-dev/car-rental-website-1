@@ -5,68 +5,15 @@ import CarCard, { CarProps } from "@/components/CarCard";
 import Filters, { FilterState } from "@/components/Filters";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fetchCars, PaginatedResponse } from "@/lib/api";
+import { useApiQuery } from "@/hooks/use-api-query";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const CatalogPage = () => {
-  // Demo data (в реальном проекте это будет приходить с сервера)
-  const allCars: CarProps[] = [
-    {
-      id: "1",
-      name: "Toyota Camry",
-      image: "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 3000,
-      type: "Седан",
-      seats: 5,
-      transmission: "Автомат"
-    },
-    {
-      id: "2",
-      name: "Kia Rio",
-      image: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 2000,
-      type: "Седан",
-      seats: 5,
-      transmission: "Механика"
-    },
-    {
-      id: "3",
-      name: "Hyundai Creta",
-      image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 2500,
-      type: "Кроссовер",
-      seats: 5,
-      transmission: "Автомат"
-    },
-    {
-      id: "4",
-      name: "BMW X5",
-      image: "https://images.unsplash.com/photo-1523983388277-336a66bf9bcd?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 8000,
-      type: "Внедорожник",
-      seats: 5,
-      transmission: "Автомат"
-    },
-    {
-      id: "5",
-      name: "Mercedes E-Class",
-      image: "https://images.unsplash.com/photo-1617788138017-80ad40651399?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 7000,
-      type: "Седан",
-      seats: 5,
-      transmission: "Автомат"
-    },
-    {
-      id: "6",
-      name: "Volkswagen Polo",
-      image: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-      price: 1500,
-      type: "Хэтчбек",
-      seats: 5,
-      transmission: "Механика"
-    }
-  ];
-
-  const [cars, setCars] = useState<CarProps[]>(allCars);
   const [sortOrder, setSortOrder] = useState("default");
+  const [currentPage, setCurrentPage] = useState(1);
   const [currentFilters, setCurrentFilters] = useState<FilterState>({
     search: "",
     carClass: "",
@@ -76,58 +23,87 @@ const CatalogPage = () => {
     seats: "",
   });
 
-  // Применить фильтры и сортировку к списку машин
-  useEffect(() => {
-    let filteredCars = [...allCars];
+  // Преобразование фильтров для API
+  const getApiFilters = () => {
+    const filters: Record<string, any> = {};
     
-    // Фильтрация по поиску
     if (currentFilters.search) {
-      filteredCars = filteredCars.filter(car => 
-        car.name.toLowerCase().includes(currentFilters.search.toLowerCase())
-      );
+      filters.search = currentFilters.search;
     }
     
-    // Фильтрация по цене
-    filteredCars = filteredCars.filter(car => 
-      car.price >= currentFilters.priceRange[0] && car.price <= currentFilters.priceRange[1]
-    );
+    if (currentFilters.carClass) {
+      filters.carClass = currentFilters.carClass;
+    }
     
-    // Фильтрация по трансмиссии
     if (currentFilters.transmission) {
-      const transmissionMap = {
-        "automatic": "Автомат",
-        "manual": "Механика"
-      };
-      filteredCars = filteredCars.filter(car => 
-        car.transmission === transmissionMap[currentFilters.transmission as keyof typeof transmissionMap]
-      );
+      filters.transmission = currentFilters.transmission;
     }
     
-    // Фильтрация по количеству мест
     if (currentFilters.seats) {
-      filteredCars = filteredCars.filter(car => 
-        car.seats === parseInt(currentFilters.seats)
-      );
+      filters.seats = currentFilters.seats;
     }
     
-    // Сортировка
+    if (currentFilters.hasAC) {
+      filters.hasAC = currentFilters.hasAC;
+    }
+    
+    filters.minPrice = currentFilters.priceRange[0];
+    filters.maxPrice = currentFilters.priceRange[1];
+    
+    return filters;
+  };
+
+  // Используем хук для получения данных с API
+  const { 
+    data: carsData,
+    isLoading,
+    error,
+    refetch
+  } = useApiQuery<PaginatedResponse<CarProps>>({
+    queryFn: () => fetchCars(currentPage, 10, getApiFilters()),
+  });
+
+  // Применяем локальную сортировку после получения данных
+  const sortCars = (cars: CarProps[]): CarProps[] => {
+    const sortedCars = [...cars];
+    
     if (sortOrder === "price-asc") {
-      filteredCars.sort((a, b) => a.price - b.price);
+      sortedCars.sort((a, b) => a.price - b.price);
     } else if (sortOrder === "price-desc") {
-      filteredCars.sort((a, b) => b.price - a.price);
+      sortedCars.sort((a, b) => b.price - a.price);
     } else if (sortOrder === "name-asc") {
-      filteredCars.sort((a, b) => a.name.localeCompare(b.name));
+      sortedCars.sort((a, b) => a.name.localeCompare(b.name));
     }
     
-    setCars(filteredCars);
-  }, [currentFilters, sortOrder]);
+    return sortedCars;
+  };
+
+  const cars = carsData ? sortCars(carsData.data) : [];
+  const totalCars = carsData?.total || 0;
+
+  // Обновляем данные при изменении фильтров или страницы
+  useEffect(() => {
+    refetch();
+  }, [currentFilters, currentPage]);
 
   const handleFilterChange = (filters: FilterState) => {
     setCurrentFilters(filters);
+    setCurrentPage(1); // Сбрасываем на первую страницу при изменении фильтров
   };
 
   const handleSortChange = (value: string) => {
     setSortOrder(value);
+  };
+
+  const handleResetFilters = () => {
+    setCurrentFilters({
+      search: "",
+      carClass: "",
+      priceRange: [1000, 10000],
+      transmission: "",
+      hasAC: false,
+      seats: "",
+    });
   };
 
   return (
@@ -154,7 +130,12 @@ const CatalogPage = () => {
           <div className="w-full md:w-3/4">
             {/* Sort controls */}
             <div className="flex justify-between items-center mb-6">
-              <p className="text-gray-600">Найдено автомобилей: {cars.length}</p>
+              <p className="text-gray-600">
+                {isLoading 
+                  ? "Загрузка автомобилей..." 
+                  : `Найдено автомобилей: ${totalCars}`
+                }
+              </p>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">Сортировать по:</span>
                 <Select value={sortOrder} onValueChange={handleSortChange}>
@@ -170,30 +151,54 @@ const CatalogPage = () => {
                 </Select>
               </div>
             </div>
+
+            {/* Error message */}
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Ошибка</AlertTitle>
+                <AlertDescription>
+                  Произошла ошибка при загрузке автомобилей. Пожалуйста, попробуйте позже.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Loading state */}
+            {isLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg overflow-hidden shadow">
+                    <Skeleton className="h-48 w-full" />
+                    <div className="p-4">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-1/2 mb-4" />
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-4 w-1/4" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             
             {/* Cars grid */}
-            {cars.length > 0 ? (
+            {!isLoading && cars.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cars.map(car => (
                   <CarCard key={car.id} car={car} />
                 ))}
               </div>
-            ) : (
+            )}
+
+            {/* Empty state */}
+            {!isLoading && cars.length === 0 && (
               <div className="text-center py-12">
                 <h3 className="text-xl font-semibold text-gray-800 mb-2">Нет автомобилей, соответствующих фильтрам</h3>
                 <p className="text-gray-600 mb-6">Попробуйте изменить параметры поиска</p>
                 <Button 
                   variant="outline" 
-                  onClick={() => {
-                    setCurrentFilters({
-                      search: "",
-                      carClass: "",
-                      priceRange: [1000, 10000],
-                      transmission: "",
-                      hasAC: false,
-                      seats: "",
-                    });
-                  }}
+                  onClick={handleResetFilters}
                 >
                   Сбросить фильтры
                 </Button>
