@@ -1,136 +1,157 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-// Тип для кэша API
-type ApiCache<T> = {
-  [key: string]: {
-    data: T;
-    timestamp: number;
-    ttl: number;
-  };
-};
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number; // время жизни кэша в миллисекундах
+}
 
-// Глобальный кэш для всех запросов API
-const globalApiCache: ApiCache<any> = {};
+// Глобальное хранилище кэша
+const globalCache: Record<string, CacheEntry<any>> = {};
 
-// Опции хука кэширования API
-interface ApiCacheOptions<T> {
-  cacheKey: string;       // Ключ для элемента кэша
-  ttl?: number;          // Время жизни кэша в миллисекундах
-  initialData?: T;       // Начальные данные
-  queryFn: () => Promise<T>; // Функция запроса
-  enabled?: boolean;     // Автоматически выполнять запрос при монтировании
+export interface ApiCacheOptions<T> {
+  cacheKey: string;        // уникальный ключ для кэширования
+  ttl?: number;            // время жизни кэша в миллисекундах
+  queryFn: () => Promise<T>; // функция для получения данных
+  enabled?: boolean;       // выполнять ли запрос сразу
+  onSuccess?: (data: T) => void; // коллбэк при успешном получении данных
+  onError?: (error: Error) => void; // коллбэк при ошибке
 }
 
 /**
- * Хук для кэширования результатов API запросов
+ * Хук для кэширования API-запросов с контролем времени жизни кэша
  */
-export function useApiCache<T>({
+export function useApiCache<T = any>({
   cacheKey,
-  ttl = 5 * 60 * 1000, // 5 минут по умолчанию
-  initialData,
+  ttl = 5 * 60 * 1000, // по умолчанию 5 минут
   queryFn,
-  enabled = true
+  enabled = true,
+  onSuccess,
+  onError
 }: ApiCacheOptions<T>) {
-  const [data, setData] = useState<T | undefined>(initialData);
+  const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Проверка, действителен ли кэш
-  const isCacheValid = useCallback((key: string): boolean => {
-    const cache = globalApiCache[key];
-    if (!cache) return false;
-    
-    const now = Date.now();
-    return now - cache.timestamp < cache.ttl;
-  }, []);
+  // Функция проверки валидности кэша
+  const isCacheValid = (entry: CacheEntry<T>): boolean => {
+    return Date.now() - entry.timestamp < entry.ttl;
+  };
 
-  // Получение данных из кэша
-  const getFromCache = useCallback((key: string): T | undefined => {
-    if (isCacheValid(key)) {
-      return globalApiCache[key].data;
-    }
-    return undefined;
-  }, [isCacheValid]);
-
-  // Сохранение данных в кэш
-  const saveToCache = useCallback((key: string, data: T, customTtl?: number) => {
-    globalApiCache[key] = {
-      data,
-      timestamp: Date.now(),
-      ttl: customTtl || ttl
-    };
-  }, [ttl]);
-
-  // Функция для выполнения запроса
-  const fetchData = useCallback(async (skipCache = false): Promise<T> => {
-    // Проверяем кэш, если не требуется пропустить
-    if (!skipCache) {
-      const cachedData = getFromCache(cacheKey);
-      if (cachedData) {
-        setData(cachedData);
-        return cachedData;
-      }
-    }
-    
+  // Получение данных из кэша или через API-запрос
+  const fetchData = async (force = false): Promise<T> => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
+      // Проверяем кэш, если не требуется принудительная загрузка
+      if (!force && globalCache[cacheKey] && isCacheValid(globalCache[cacheKey])) {
+        const cachedData = globalCache[cacheKey].data;
+        setData(cachedData);
+        setIsLoading(false);
+        onSuccess?.(cachedData);
+        return cachedData;
+      }
+
+      // Выполняем запрос
       const result = await queryFn();
-      setData(result);
       
       // Сохраняем в кэш
-      saveToCache(cacheKey, result);
+      globalCache[cacheKey] = {
+        data: result,
+        timestamp: Date.now(),
+        ttl
+      };
       
+      setData(result);
+      onSuccess?.(result);
       return result;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Произошла ошибка при выполнении запроса');
+      const error = err instanceof Error ? err : new Error('Неизвестная ошибка');
       setError(error);
+      onError?.(error);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [cacheKey, queryFn, getFromCache, saveToCache]);
+  };
 
-  // Функция для принудительного обновления данных
-  const refetch = useCallback(() => {
-    return fetchData(true);
-  }, [fetchData]);
+  // Метод для принудительного обновления данных
+  const refetch = () => fetchData(true);
 
-  // Функция для очистки кэша
-  const clearCache = useCallback(() => {
-    delete globalApiCache[cacheKey];
-  }, [cacheKey]);
+  // Очистка кэша для конкретного ключа
+  const invalidateCache = () => {
+    delete globalCache[cacheKey];
+  };
 
-  // Автоматическое выполнение запроса при монтировании компонента
+  // Получение данных при первом рендере, если enabled=true
   useEffect(() => {
     if (enabled) {
-      fetchData().catch(() => {}); // Подавляем ошибки, так как они уже обрабатываются в состоянии
+      fetchData().catch(() => {}); // игнорируем ошибки здесь, они обрабатываются в fetchData
     }
-  }, [enabled, fetchData]);
+  }, [cacheKey, enabled]);
 
   return {
     data,
     isLoading,
     error,
     refetch,
-    clearCache
+    invalidateCache
   };
 }
 
-// Утилита для очистки всего кэша
-export function clearAllApiCache() {
-  Object.keys(globalApiCache).forEach(key => {
-    delete globalApiCache[key];
+/**
+ * Очистка всего кэша API
+ */
+export function clearApiCache(): void {
+  Object.keys(globalCache).forEach(key => {
+    delete globalCache[key];
   });
 }
 
-// Утилита для очистки кэша по префиксу
-export function clearApiCacheByPrefix(prefix: string) {
-  Object.keys(globalApiCache)
+/**
+ * Очистка кэша API по префиксу ключа
+ */
+export function clearApiCacheByPrefix(prefix: string): void {
+  Object.keys(globalCache)
     .filter(key => key.startsWith(prefix))
     .forEach(key => {
-      delete globalApiCache[key];
+      delete globalCache[key];
     });
+}
+
+/**
+ * Функция для предварительной загрузки данных в кэш
+ */
+export function prefetchApiData<T>(
+  cacheKey: string, 
+  queryFn: () => Promise<T>,
+  ttl: number = 5 * 60 * 1000
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    queryFn()
+      .then(data => {
+        globalCache[cacheKey] = {
+          data,
+          timestamp: Date.now(),
+          ttl
+        };
+        resolve(data);
+      })
+      .catch(reject);
+  });
+}
+
+/**
+ * Функция для пакетной загрузки данных
+ */
+export function batchPrefetch<T>(
+  queries: Array<{ cacheKey: string; queryFn: () => Promise<T>; ttl?: number }>
+): Promise<Array<T>> {
+  return Promise.all(
+    queries.map(({ cacheKey, queryFn, ttl = 5 * 60 * 1000 }) => 
+      prefetchApiData(cacheKey, queryFn, ttl)
+    )
+  );
 }
