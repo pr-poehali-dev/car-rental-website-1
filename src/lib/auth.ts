@@ -10,10 +10,66 @@ export interface AuthTokens {
   expiresAt: number; // timestamp когда истекает access token
 }
 
+// Роли пользователей системы
+export enum UserRole {
+  GUEST = 'guest',
+  USER = 'user',
+  MANAGER = 'manager',
+  ADMIN = 'admin'
+}
+
+// Разрешения для ролей
+export enum Permission {
+  READ_CARS = 'read:cars',
+  CREATE_CARS = 'create:cars',
+  UPDATE_CARS = 'update:cars',
+  DELETE_CARS = 'delete:cars',
+  READ_USERS = 'read:users',
+  CREATE_USERS = 'create:users',
+  UPDATE_USERS = 'update:users',
+  DELETE_USERS = 'delete:users',
+  MANAGE_ORDERS = 'manage:orders',
+  READ_ANALYTICS = 'read:analytics',
+  MANAGE_SETTINGS = 'manage:settings'
+}
+
+// Разрешения по умолчанию для каждой роли
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  [UserRole.GUEST]: [
+    Permission.READ_CARS
+  ],
+  [UserRole.USER]: [
+    Permission.READ_CARS
+  ],
+  [UserRole.MANAGER]: [
+    Permission.READ_CARS,
+    Permission.CREATE_CARS,
+    Permission.UPDATE_CARS,
+    Permission.MANAGE_ORDERS
+  ],
+  [UserRole.ADMIN]: [
+    Permission.READ_CARS,
+    Permission.CREATE_CARS,
+    Permission.UPDATE_CARS,
+    Permission.DELETE_CARS,
+    Permission.READ_USERS,
+    Permission.CREATE_USERS,
+    Permission.UPDATE_USERS,
+    Permission.DELETE_USERS,
+    Permission.MANAGE_ORDERS,
+    Permission.READ_ANALYTICS,
+    Permission.MANAGE_SETTINGS
+  ]
+};
+
 export interface AuthUser {
   id: string;
   name: string;
-  role: string;
+  email?: string;
+  role: UserRole;
+  permissions?: Permission[];
+  avatar?: string;
+  authProvider?: 'email' | 'google' | 'facebook';
 }
 
 // Ключи для хранения в localStorage
@@ -75,10 +131,42 @@ export const isAuthenticated = (): boolean => {
   return !!tokens && !!user && !isTokenExpired();
 };
 
-// Проверка роли администратора
-export const isAdmin = (): boolean => {
+// Проверка наличия роли
+export const hasRole = (requiredRole: UserRole): boolean => {
   const { user } = getAuthData();
-  return !!user && user.role === 'admin';
+  if (!user) return false;
+  
+  // Администратор имеет все права
+  if (user.role === UserRole.ADMIN) return true;
+  
+  return user.role === requiredRole;
+};
+
+// Проверка наличия разрешения
+export const hasPermission = (requiredPermission: Permission): boolean => {
+  const { user } = getAuthData();
+  if (!user) return false;
+  
+  // Проверяем пользовательские разрешения, если они есть
+  if (user.permissions && user.permissions.includes(requiredPermission)) {
+    return true;
+  }
+  
+  // Иначе проверяем разрешения по роли
+  return ROLE_PERMISSIONS[user.role].includes(requiredPermission);
+};
+
+// Получение всех разрешений пользователя
+export const getUserPermissions = (): Permission[] => {
+  const { user } = getAuthData();
+  if (!user) return [];
+  
+  // Объединяем разрешения роли и пользовательские разрешения
+  const rolePermissions = ROLE_PERMISSIONS[user.role] || [];
+  const userPermissions = user.permissions || [];
+  
+  // Удаляем дубликаты
+  return [...new Set([...rolePermissions, ...userPermissions])];
 };
 
 // Получение текущего пользователя
