@@ -15,6 +15,8 @@ import CarDetail from "./pages/CarDetail";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProfilePage from "./pages/ProfilePage";
+import CartPage from "./pages/CartPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCarsPage from "./pages/AdminCarsPage";
@@ -22,6 +24,8 @@ import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminRolesPage from "./pages/AdminRolesPage";
 import AdminAuditLogPage from "./pages/AdminAuditLogPage";
 import AdminBackupPage from "./pages/AdminBackupPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminOrdersPage from "./pages/AdminOrdersPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +49,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/car/:id" element={<CarDetail />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/order-success" element={<OrderSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -59,6 +65,16 @@ const App = () => (
             <Route path="/admin/cars" element={
               <ProtectedRoute adminOnly>
                 <AdminCarsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/orders" element={
+              <ProtectedRoute adminOnly>
+                <AdminOrdersPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute adminOnly>
+                <AdminUsersPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/settings" element={
