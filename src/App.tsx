@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +18,10 @@ import ProfilePage from "./pages/ProfilePage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCarsPage from "./pages/AdminCarsPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
+import AdminRolesPage from "./pages/AdminRolesPage";
+import AdminAuditLogPage from "./pages/AdminAuditLogPage";
+import AdminBackupPage from "./pages/AdminBackupPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +59,26 @@ const App = () => (
             <Route path="/admin/cars" element={
               <ProtectedRoute adminOnly>
                 <AdminCarsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/settings" element={
+              <ProtectedRoute adminOnly>
+                <AdminSettingsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/roles" element={
+              <ProtectedRoute adminOnly>
+                <AdminRolesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/audit" element={
+              <ProtectedRoute adminOnly>
+                <AdminAuditLogPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/backup" element={
+              <ProtectedRoute adminOnly>
+                <AdminBackupPage />
               </ProtectedRoute>
             } />
             
